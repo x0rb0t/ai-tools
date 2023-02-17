@@ -105,7 +105,8 @@ function estimateTokenCount(string) {
   const tokens = words.map(word => {
     if (word.length < 5) return 1
     if (word.length < 10) return 2
-    return 3
+    if (word.length < 20) return 3
+    return 4
   })
   return tokens.reduce((a, b) => a + b, 0)
 }
@@ -120,15 +121,21 @@ function truncateToEstimated(string, max_tokens) {
     const word = words[i]
     if (word.length < 5) tokens += 1
     else if (word.length < 10) tokens += 2
-    else tokens += 3
+    else if (word.length < 20) tokens += 3
+    else tokens += 4
     if (tokens > max_tokens) {
       wasTruncated = true
       break
     }
     result += word + ' '
   }
+  result = result.trim()
   if (wasTruncated) {
-    result += '\n<truncated>'
+    if (result.length > 0) {
+      result += '\n<truncated>'
+    } else {
+      result = '<truncated>'
+    }
   }
   return result
 }
@@ -250,6 +257,12 @@ async function main(argv) {
       if (change.estimated_tokens > leftTokens) {
         //truncate this change
         const truncated = truncateToEstimated(change.content, leftTokens)
+        if (truncated === '<truncated>' || truncated.length === 0) {
+          //remove this change
+          changes.splice(i, 1)
+          i--
+          continue
+        }
         change.content = truncated
         change.estimated_tokens = estimateTokenCount(truncated)
       }
