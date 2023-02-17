@@ -14,7 +14,8 @@ git clone
 
 ## Usage
 ```
-git-ai-commit [--verbose] [--hint <hint>] [--model <model>]
+git-ai-commit [--verbose] [--hint <hint>] [--model <model>] [--count <count>]
+
 ```
 
 ## Examples

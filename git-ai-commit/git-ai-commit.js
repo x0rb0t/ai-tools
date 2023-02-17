@@ -306,7 +306,7 @@ async function main(argv) {
 
 
 function print_usage() {
-  console.log('Usage: git-ai-commit [--verbose] [--hint <hint>] [--model <model>]')
+  console.log('Usage: git-ai-commit [--verbose] [--hint <hint>] [--model <model>] [--count <count>]')
   console.log('Options:')
   console.log('  --model <model>  Use a specific model. Available models:')
   console.log('                   text-davinci-003')
@@ -315,6 +315,7 @@ function print_usage() {
   console.log('                   text-babbage-001')
   console.log('  --hint <hint>    Use a hint for the commit message')
   console.log('  --verbose        Print more information')
+  console.log('  --count <count>  Generate multiple commit messages')
   console.log('  --help           Print this help')
 }
 
