@@ -99,6 +99,39 @@ async function runStep(changesString, hint, model) {
   })
 }
 
+function estimateTokenCount(string) {
+  //estimate token count
+  const words = string.split(' ')
+  const tokens = words.map(word => {
+    if (word.length < 5) return 1
+    if (word.length < 10) return 2
+    return 3
+  })
+  return tokens.reduce((a, b) => a + b, 0)
+}
+
+
+function truncateToEstimated(string, max_tokens) {
+  const words = string.split(' ')
+  let tokens = 0
+  let result = ''
+  let wasTruncated = false
+  for (let i = 0; i < words.length; i++) {
+    const word = words[i]
+    if (word.length < 5) tokens += 1
+    else if (word.length < 10) tokens += 2
+    else tokens += 3
+    if (tokens > max_tokens) {
+      wasTruncated = true
+      break
+    }
+    result += word + ' '
+  }
+  if (wasTruncated) {
+    result += '\n<truncated>'
+  }
+  return result
+}
 
 async function main(argv) {
   if (argv.includes('--help')) {
@@ -170,6 +203,10 @@ async function main(argv) {
     return
   }
 
+  const changesFilesString = files.map(file => {
+    return file.line
+  }).join('\n') 
+
   //exec git diff for each file
   const changes = await Promise.all(files.map(async file => {
     const { stdout, stderr } = await execPromise(`git diff --color=never --staged ${rootPath}/${file.filename}`);
@@ -177,21 +214,49 @@ async function main(argv) {
       console.log(`error: ${stderr}`);
       return;
     }
-    return stdout
+    return {
+      filename: file.filename,
+      content: stdout,
+      estimated_tokens: estimateTokenCount(stdout)
+    }
   }))
 
+  changes.sort((a, b) => a.estimated_tokens - b.estimated_tokens)
 
-  //truncate and concatenate changes 
-  const changesFilesString = files.map(file => {
-    return file.line
-  }).join('\n') 
-  const changesString = changes.map(change => {
-    //change.slice(0, 1024)
-    if (change.length > 1024) {
-      return change.slice(0, 1024) + '...'
+  //calc max tokens, it is max model output tokens - 512
+  const max_tokens = 4096 - 512
+  //we need to combine changes for all files in such a way that total token count is less than max_tokens
+  //we will try to combine changes for each file, starting from the smallest one
+
+  let totalEstimatedTokens = 0
+  for (let i = 0; i < changes.length; i++) {
+    totalEstimatedTokens += changes[i].estimated_tokens
+  }
+  if (totalEstimatedTokens > max_tokens) {
+    //we need to truncate some changes
+    let totalTokens = 0
+    for (let i = 0; i < changes.length; i++) {
+      const change = changes[i]
+      const leftTokens = (max_tokens - totalTokens) * 0.5
+      if (leftTokens < 0) {
+        //remove this change
+        changes.splice(i, 1)
+        i--
+        continue
+      }
+      if (change.estimated_tokens > leftTokens) {
+        //truncate this change
+        const truncated = truncateToEstimated(change.content, leftTokens)
+        change.content = truncated
+        change.estimated_tokens = estimateTokenCount(truncated)
+      }
+      totalTokens += change.estimated_tokens
     }
-    return change
-  }).join('\n').slice(0, 8192)
+  }
+
+  const changesString = truncateToEstimated(changes.map(change => {
+    return change.content
+  }).join('\n'), max_tokens)
   
   if (!changesString) {
     console.log('No changes to commit')
