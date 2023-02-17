@@ -224,7 +224,7 @@ async function main(argv) {
   changes.sort((a, b) => a.estimated_tokens - b.estimated_tokens)
 
   //calc max tokens, it is max model output tokens - 512
-  const max_tokens = 4096 - 512
+  const max_tokens = 1024*3 - 512
   //we need to combine changes for all files in such a way that total token count is less than max_tokens
   //we will try to combine changes for each file, starting from the smallest one
 
@@ -240,7 +240,7 @@ async function main(argv) {
     let totalTokens = 0
     for (let i = 0; i < changes.length; i++) {
       const change = changes[i]
-      const leftTokens = (max_tokens - totalTokens) * 0.5
+      const leftTokens = (max_tokens - totalTokens) * 0.8
       if (leftTokens < 0) {
         //remove this change
         changes.splice(i, 1)
