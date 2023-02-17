@@ -76,6 +76,7 @@ async function runCompletion(changes, messageHint, model) {
     result = response.data.choices[0].text
   } catch (e) {
     console.log(e)
+    throw e
   }
   return result
 }
@@ -100,37 +101,18 @@ async function runStep(changesString, hint, model) {
 }
 
 function estimateTokenCount(string) {
-  //estimate token count
-  const words = string.split(' ')
-  const tokens = words.map(word => {
-    if (word.length < 5) return 1
-    if (word.length < 10) return 2
-    if (word.length < 20) return 3
-    return 4
-  })
-  return tokens.reduce((a, b) => a + b, 0)
+  //estimate token count, wihout splitting the string
+  const k = 0.5
+  const n = string.length
+  return Math.round(k * n)
 }
 
 
 function truncateToEstimated(string, max_tokens) {
-  const words = string.split(' ')
-  let tokens = 0
-  let result = ''
-  let wasTruncated = false
-  for (let i = 0; i < words.length; i++) {
-    const word = words[i]
-    if (word.length < 5) tokens += 1
-    else if (word.length < 10) tokens += 2
-    else if (word.length < 20) tokens += 3
-    else tokens += 4
-    if (tokens > max_tokens) {
-      wasTruncated = true
-      break
-    }
-    result += word + ' '
-  }
-  result = result.trim()
-  if (wasTruncated) {
+  const k = 0.5
+  let result = string
+  if (string.length > max_tokens / k) {
+    result = string.substring(0, max_tokens)
     if (result.length > 0) {
       result += '\n<truncated>'
     } else {
