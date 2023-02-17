@@ -45,7 +45,7 @@ const PROMPT_TEMPLATE = `### Task: Write a git commit message describing the cha
 
 git commit -m "`
 
-async function runCompletion(changes, messageHint, model) {
+async function runCompletion(changes, messageHint, model, count) {
   let instruction = 'Please type your commit command with the message below:'
   if (messageHint) {
     instruction = `Please use an additional hint for your commit message. It may help you to write a better message.\n`
@@ -60,7 +60,7 @@ async function runCompletion(changes, messageHint, model) {
                 .replace('%CHANGES%', changes)
                 
                                 
-  let result = null
+  let result = []
   try {
     //console.log(`Running completion with:\n ${input}`)
     const response = await openai.createCompletion({
@@ -72,8 +72,9 @@ async function runCompletion(changes, messageHint, model) {
       frequency_penalty: 0,
       presence_penalty: 0,
       stop: ['"', '\n'],
+      n: count,
     })
-    result = response.data.choices[0].text
+    result = response.data.choices.map((choice) => choice.text) 
   } catch (e) {
     console.log(e)
     throw e
@@ -82,7 +83,8 @@ async function runCompletion(changes, messageHint, model) {
 }
 
 async function runStep(changesString, hint, model) {
-  const result = await runCompletion(changesString, hint, model)
+  const res = await runCompletion(changesString, hint, model, 1)
+  const result = res[0]
   console.log(`Message: "${result}"`)
 
   readline.question(`Is this a good message for the commit? [y/n]: `, async (answer) => {
@@ -92,6 +94,26 @@ async function runStep(changesString, hint, model) {
       readline.close()
     } else if (answer === 'n') {
       await runStep(changesString, hint, model)
+    } else {
+      console.log('Cancelled')
+      readline.close()
+      process.exit(0)
+    }
+  })
+}
+
+async function runMultiple(changesString, hint, model, count) {
+  const res = await runCompletion(changesString, hint, model, count)
+  console.log(`Messages:`)
+  res.forEach((message, index) => {
+    console.log(`${index + 1}. "${message}"`)
+  })
+  readline.question(`Enter the number of the message you want to use for the commit: `, async (answer) => {
+    const number = parseInt(answer)
+    if (number > 0 && number <= count) {
+      console.log(`git commit -m "${res[number - 1]}"`)
+      execPromise(`git commit -m "${res[number - 1]}"`)
+      readline.close()
     } else {
       console.log('Cancelled')
       readline.close()
@@ -136,6 +158,7 @@ async function main(argv) {
     return
   }
   const hint = argv.includes('--hint') ? argv[argv.indexOf('--hint') + 1] : null
+  const count = argv.includes('--count') ? parseInt(argv[argv.indexOf('--count') + 1]) : 1
   //check if it is git repo
   const { stdout: gitStatus, stderr: gitStatusError } = await execPromise('git status');
   if (gitStatusError) {
@@ -213,7 +236,7 @@ async function main(argv) {
   changes.sort((a, b) => a.estimated_tokens - b.estimated_tokens)
 
   //calc max tokens, it is max model output tokens - 512
-  const max_tokens = 1024*2 - 512
+  const max_tokens = 1024*2
   //we need to combine changes for all files in such a way that total token count is less than max_tokens
   //we will try to combine changes for each file, starting from the smallest one
 
@@ -274,7 +297,11 @@ async function main(argv) {
   
   
   //send changes to OpenAI's API
-  await runStep(modelInput, hint, model)
+  if (count > 1) {
+    await runMultiple(modelInput, hint, model, count)
+  } else {
+    await runStep(modelInput, hint, model)
+  }
 }
 
 
