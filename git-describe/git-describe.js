@@ -138,6 +138,7 @@ async function main(argv) {
   if (verbose && hint) {
     console.log(`Using hint: ${hint}`)
   }
+
   //exec git diff for staged changes
   //we need to get full path to the file
   const { stdout, stderr } = await execPromise('git diff --staged --name-status');
@@ -146,7 +147,7 @@ async function main(argv) {
     process.exit(0)
     return;
   }
-  //parse output and collect changes individually, truncate each change to 256 characters
+  
   //console.log(`stdout: ${stdout}`);
   const files = stdout.split('\n').map(line => {
     const [status, filename] = line.split('\t')
@@ -161,7 +162,7 @@ async function main(argv) {
     process.exit(0)
     return
   }
-  //console.log(files)
+
   //exec git diff for each file
   const changes = await Promise.all(files.map(async file => {
     const { stdout, stderr } = await execPromise(`git diff --color=never --staged ${rootPath}/${file.filename}`);
@@ -171,6 +172,8 @@ async function main(argv) {
     }
     return stdout
   }))
+
+
   //truncate and concatenate changes 
   const changesFilesString = files.map(file => {
     return `${file.status} ${file.filename}`
@@ -182,6 +185,7 @@ async function main(argv) {
     }
     return change
   }).join('\n').slice(0, 8192)
+  
   if (!changesString) {
     console.log('No changes to commit')
     process.exit(0)
