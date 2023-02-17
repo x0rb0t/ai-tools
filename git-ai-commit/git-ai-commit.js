@@ -150,9 +150,16 @@ async function main(argv) {
   
   //console.log(`stdout: ${stdout}`);
   const files = stdout.split('\n').map(line => {
-    const [status, filename] = line.split('\t')
+    /*
+        A       README.md
+    R098    git-describe/git-describe.js    git-ai-commit/git-ai-commit.js
+    R100    git-describe/package-lock.json  git-ai-commit/package-lock.json
+    R070    git-describe/package.json       git-ai-commit/package.json
+    */
+    const [status, oldName, newName] = line.split('\t')
+    let filename = newName ? newName : oldName
     if (!status || !filename) return null
-    return { status, filename }
+    return { status, filename, line }
   }).filter(file => file)
   if (verbose) {
     console.log(`Found ${files.length} files with changes`)
@@ -176,7 +183,7 @@ async function main(argv) {
 
   //truncate and concatenate changes 
   const changesFilesString = files.map(file => {
-    return `${file.status} ${file.filename}`
+    return file.line
   }).join('\n') 
   const changesString = changes.map(change => {
     //change.slice(0, 1024)
@@ -191,7 +198,7 @@ async function main(argv) {
     process.exit(0)
     return
   }
-  const modelInput = '% git diff --staged --name-status --relative\n'
+  const modelInput = '% git diff --staged --name-status\n'
       + changesFilesString + '\n' 
       + '% git diff --color=never --staged\n'
       + changesString
