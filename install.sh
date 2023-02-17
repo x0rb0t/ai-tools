@@ -49,4 +49,4 @@ echo "Installing script: $1 to $INSTALL_PATH"
 # Make link to the script
 ln -s "$SCRIPT" "$INSTALL_PATH/$1"
 
-echo "Done!"
+echo "Done!" 

@@ -121,6 +121,15 @@ async function main(argv) {
     process.exit(0)
     return;
   }
+  //get repo path with git rev-parse --show-toplevel
+  const { stdout: gitRepoPath, stderr: gitRepoPathError } = await execPromise('git rev-parse --show-toplevel');
+  if (gitRepoPathError) {
+    console.error(`error: ${gitRepoPathError}`);
+    process.exit(0)
+    return;
+  }
+  const rootPath = gitRepoPath.trim()
+
 
 
   if (verbose) {
@@ -131,7 +140,7 @@ async function main(argv) {
   }
   //exec git diff for staged changes
   //we need to get full path to the file
-  const { stdout, stderr } = await execPromise('git diff --staged --name-status --relative');
+  const { stdout, stderr } = await execPromise('git diff --staged --name-status');
   if (stderr) {
     console.error(`error: ${stderr}`);
     process.exit(0)
@@ -155,7 +164,7 @@ async function main(argv) {
   //console.log(files)
   //exec git diff for each file
   const changes = await Promise.all(files.map(async file => {
-    const { stdout, stderr } = await execPromise(`git diff --color=never --staged ${file.filename}`);
+    const { stdout, stderr } = await execPromise(`git diff --color=never --staged ${rootPath}/${file.filename}`);
     if (stderr) {
       console.log(`error: ${stderr}`);
       return;
