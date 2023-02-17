@@ -232,6 +232,9 @@ async function main(argv) {
   for (let i = 0; i < changes.length; i++) {
     totalEstimatedTokens += changes[i].estimated_tokens
   }
+  if (verbose) {
+    console.log(`Total estimated tokens: ${totalEstimatedTokens}`)
+  }
   if (totalEstimatedTokens > max_tokens) {
     //we need to truncate some changes
     let totalTokens = 0
@@ -251,6 +254,9 @@ async function main(argv) {
         change.estimated_tokens = estimateTokenCount(truncated)
       }
       totalTokens += change.estimated_tokens
+    }
+    if (verbose) {
+      console.log(`Total estimated tokens after truncation: ${totalTokens}`)
     }
   }
 
