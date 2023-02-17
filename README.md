@@ -1,7 +1,7 @@
-# AI console assitant tools
+# AI console assistant tools
 
-## Tools
-git-ai-commit - helps to write a commit message base on a diff
+## Tools (list)
+- git-ai-commit (helps to write commit messages)
 
 ## Requirements
 export OPENAI_API_KEY=sk-...
@@ -14,5 +14,5 @@ git clone
 
 ## Usage
 ```
-git-ai-commit
+git-ai-commit [--verbose] [--hint <hint>] [--model <model>]
 ```
