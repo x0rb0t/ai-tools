@@ -33,8 +33,6 @@ const models = [
   'text-babbage-001',
 ]
 
-const model = models[0]
-
 const PROMPT_TEMPLATE = `### Task: Write a git commit message describing the changes made to the following files:
 
 %CHANGES%
@@ -103,6 +101,11 @@ async function runStep(changesString, hint, model) {
 
 
 async function main(argv) {
+  if (argv.includes('--help')) {
+    print_usage()
+    process.exit(0)
+    return
+  }
   const verbose = argv.includes('--verbose')
   const model = argv.includes('--model') ? argv[argv.indexOf('--model') + 1] : models[0]
   if (process.env.OPENAI_API_KEY === undefined) {
@@ -187,6 +190,21 @@ async function main(argv) {
   //send changes to OpenAI's API
   await runStep(modelInput, hint, model)
 }
+
+
+function print_usage() {
+  console.log('Usage: git-describe [--verbose] [--hint <hint>] [--model <model>]')
+  console.log('Options:')
+  console.log('  --model <model>  Use a specific model. Available models:')
+  console.log('                   text-davinci-003')
+  console.log('                   text-davinci-002')
+  console.log('                   text-curie-001')
+  console.log('                   text-babbage-001')
+  console.log('  --hint <hint>    Use a hint for the commit message')
+  console.log('  --verbose        Print more information')
+  console.log('  --help           Print this help')
+}
+
 
 main(process.argv.slice(2));
   
