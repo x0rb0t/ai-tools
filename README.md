@@ -16,3 +16,7 @@ git clone
 ```
 git-ai-commit [--verbose] [--hint <hint>] [--model <model>]
 ```
+
+## Examples
+```
+git-ai-commit --hint "Show examples of how to use the tool"
