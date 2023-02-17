@@ -209,7 +209,7 @@ async function main(argv) {
 
   //exec git diff for each file
   const changes = await Promise.all(files.map(async file => {
-    const { stdout, stderr } = await execPromise(`git diff --color=never --staged ${rootPath}/${file.filename}`);
+    const { stdout, stderr } = await execPromise(`git diff --color=never --staged "${rootPath}/${file.filename}"`);
     if (stderr) {
       console.log(`error: ${stderr}`);
       return;
