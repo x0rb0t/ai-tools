@@ -206,7 +206,7 @@ async function main(argv) {
 
 
 function print_usage() {
-  console.log('Usage: git-describe [--verbose] [--hint <hint>] [--model <model>]')
+  console.log('Usage: git-ai-commit [--verbose] [--hint <hint>] [--model <model>]')
   console.log('Options:')
   console.log('  --model <model>  Use a specific model. Available models:')
   console.log('                   text-davinci-003')
