@@ -44,9 +44,14 @@ const PROMPT_TEMPLATE = `### Task: Write a git commit message describing the cha
 
 ---
 
-git commit -m "`
+%SUFFIX%`
 
 async function runCompletion(changes, messageHint, model, count) {
+  let isChat = false
+  if (model === 'gpt-3.5-turbo') {
+    isChat = true
+  }
+
   let instruction = 'Please type your commit command with the message below:'
   if (messageHint) {
     instruction = `Please use an additional hint for your commit message. It may help you to write a better message.\n`
@@ -58,24 +63,51 @@ async function runCompletion(changes, messageHint, model, count) {
   }
   const input = PROMPT_TEMPLATE
                 .replace('%INSTRUCTION%', instruction)
+                .replace('%SUFFIX%', isChat 
+                     ? '### Write your commit command below in format "git commit -m \"<message>\"":'
+                     : 'git commit -m "')
                 .replace('%CHANGES%', changes)
+              
                 
                                 
   let result = []
   try {
     //console.log(`Running completion with:\n ${input}`)
-    const response = await openai.createCompletion({
+    const params = {
       model: model,
-      prompt: input,
-      temperature: 0.8,
-      max_tokens: 256,
-      top_p: 1,
-      frequency_penalty: 0,
-      presence_penalty: 0,
-      stop: ['"', '\n'],
+      //temperature: 0.8,
+      //max_tokens: 256,
+      //top_p: 1,
+      //frequency_penalty: 0,
+      //presence_penalty: 0,
+      //stop: ['"', '\n'],
       n: count,
-    })
-    result = response.data.choices.map((choice) => choice.text) 
+    }
+    if (isChat) {
+      params.messages = [
+        {"role": "system", "content": "You are a software developer. You are writing a commit message for a git commit. Your answer should be a git commit command in format \"git commit -m \"<message>\"\"."},
+        {"role": "user", "content":  input},
+      ]
+    } else {
+      params.prompt = input
+      params.max_tokens = 256
+      params.temperature = 0.8
+      params.top_p = 1
+      params.frequency_penalty = 0
+      params.presence_penalty = 0
+      params.stop = ['"', '\n']
+    }
+    if (isChat) {
+      const response = await openai.createChatCompletion(params)
+      //console.log(JSON.stringify(response.data, null, 2))
+      result = response.data.choices.map((choice) => choice.message.content.trim()).map(
+        command => //git commit -m "message", extract message using regex, it may be multiline
+          command.match(/git commit -m "(.*)"/s)?.[1] ?? ''
+      ).filter(message => message.length > 0)
+    } else {
+      const response = await openai.createCompletion(params)
+      result = response.data.choices.map((choice) => choice.text) 
+    }
   } catch (e) {
     console.log(e)
     throw e
@@ -152,14 +184,21 @@ async function main(argv) {
     return
   }
   const verbose = argv.includes('--verbose')
-  const model = argv.includes('--model') ? argv[argv.indexOf('--model') + 1] : models[0]
+  let model = argv.includes('--model') ? argv[argv.indexOf('--model') + 1] : models[0]
+  if (!models.includes(model)) {
+    console.error(`error: model ${model} is not supported`)
+    process.exit(0)
+    return
+  }
+
+
   if (process.env.OPENAI_API_KEY === undefined) {
     console.error('Please set OPENAI_API_KEY environment variable')
     process.exit(0)
     return
   }
   const hint = argv.includes('--hint') ? argv[argv.indexOf('--hint') + 1] : null
-  const count = argv.includes('--count') ? parseInt(argv[argv.indexOf('--count') + 1]) : 1
+  const count = argv.includes('--count') ? parseInt(argv[argv.indexOf('--count') + 1]) : 5
   //check if it is git repo
   const { stdout: gitStatus, stderr: gitStatusError } = await execPromise('git status');
   if (gitStatusError) {
@@ -310,10 +349,13 @@ function print_usage() {
   console.log('Usage: git-ai-commit [--verbose] [--hint <hint>] [--model <model>] [--count <count>]')
   console.log('Options:')
   console.log('  --model <model>  Use a specific model. Available models:')
-  console.log('                   text-davinci-003')
-  console.log('                   text-davinci-002')
-  console.log('                   text-curie-001')
-  console.log('                   text-babbage-001')
+  for (let i in models) {
+    if (i === '0') {
+      console.log(`    ${models[i]} (default)`)
+    } else {
+      console.log(`    ${models[i]}`)
+    }
+  }
   console.log('  --hint <hint>    Use a hint for the commit message')
   console.log('  --verbose        Print more information')
   console.log('  --count <count>  Generate multiple commit messages')
