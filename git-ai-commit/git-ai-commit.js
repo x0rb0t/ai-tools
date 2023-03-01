@@ -184,7 +184,11 @@ async function main(argv) {
     return
   }
   const verbose = argv.includes('--verbose')
-  let model = argv.includes('--model') ? argv[argv.indexOf('--model') + 1] : models[0]
+  let def = 0
+  if (argv.includes('--old')) {
+    def = 1
+  }
+  let model = argv.includes('--model') ? argv[argv.indexOf('--model') + 1] : models[def]
   if (!models.includes(model)) {
     console.error(`error: model ${model} is not supported`)
     process.exit(0)
@@ -359,6 +363,7 @@ function print_usage() {
   console.log('  --hint <hint>    Use a hint for the commit message')
   console.log('  --verbose        Print more information')
   console.log('  --count <count>  Generate multiple commit messages')
+  console.log('  --old            Dont use chat model, use old model')
   console.log('  --help           Print this help')
 }
 
