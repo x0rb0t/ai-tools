@@ -102,7 +102,7 @@ async function runCompletion(changes, messageHint, model, count) {
       //console.log(JSON.stringify(response.data, null, 2))
       result = response.data.choices.map((choice) => choice.message.content.trim()).map(
         command => //git commit -m "message", extract message using regex, it may be multiline
-          command.match(/git commit -m "(.*)"/s)?.[1] ?? ''
+          command.match(/git commit -m "(.*)"/s)?.[1] || command
       ).filter(message => message.length > 0)
     } else {
       const response = await openai.createCompletion(params)
