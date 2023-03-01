@@ -27,6 +27,7 @@ const configuration = new Configuration({
 const openai = new OpenAIApi(configuration);
 
 const models = [
+  'gpt-3.5-turbo',
   'text-davinci-003',
   'text-davinci-002',
   'text-curie-001',
