@@ -88,6 +88,8 @@ async function runCompletion(changes, messageHint, model, count) {
         {"role": "system", "content": "You are a software developer. You are writing a commit message for a git commit. Your answer should be a git commit command in format \"git commit -m \"<message>\"\"."},
         {"role": "user", "content":  input},
       ]
+      params.temperature = 0.8
+      params.max_tokens = 256
     } else {
       params.prompt = input
       params.max_tokens = 256
