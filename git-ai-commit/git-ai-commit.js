@@ -90,6 +90,7 @@ async function runCompletion(changes, messageHint, model, count) {
       ]
       params.temperature = 0.8
       params.max_tokens = 256
+      params.top_p = 1
     } else {
       params.prompt = input
       params.max_tokens = 256
@@ -124,8 +125,9 @@ async function runStep(changesString, hint, model) {
 
   readline.question(`Is this a good message for the commit? [y/n]: `, async (answer) => {
     if (answer === 'y') {
-      console.log(`git commit -m "${result}"`)
-      execPromise(`git commit -m "${result}"`)
+      const res = result.replace(/"/g, '\\"')
+      console.log(`git commit -m "${res}"`)
+      execPromise(`git commit -m "${res}"`)
       readline.close()
     } else if (answer === 'n') {
       await runStep(changesString, hint, model)
