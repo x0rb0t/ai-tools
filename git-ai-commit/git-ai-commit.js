@@ -145,12 +145,14 @@ async function runMultiple(changesString, hint, model, count) {
   res.forEach((message, index) => {
     console.log(`${index + 1}. "${message}"`)
   })
-  readline.question(`Enter the number of the message you want to use for the commit: `, async (answer) => {
+  readline.question(`Enter the number of the message you want to use for the commit (or type a hint): `, async (answer) => {
     const number = parseInt(answer)
     if (number > 0 && number <= count) {
       console.log(`git commit -m "${res[number - 1]}"`)
       execPromise(`git commit -m "${res[number - 1]}"`)
       readline.close()
+    } else if (answer.length > 4) {
+      await runMultiple(changesString, answer, model, count)
     } else {
       console.log('Cancelled')
       readline.close()
