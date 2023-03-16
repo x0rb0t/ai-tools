@@ -28,10 +28,16 @@ const openai = new OpenAIApi(configuration);
 
 const models = [
   'gpt-3.5-turbo',
+  'gpt-4',
   'text-davinci-003',
   'text-davinci-002',
   'text-curie-001',
   'text-babbage-001',
+]
+
+const chatModels = [
+  'gpt-3.5-turbo',
+  'gpt-4',
 ]
 
 const PROMPT_TEMPLATE = `### Task: Write a git commit message describing the changes made to the following files:
@@ -47,11 +53,8 @@ const PROMPT_TEMPLATE = `### Task: Write a git commit message describing the cha
 %SUFFIX%`
 
 async function runCompletion(changes, messageHint, model, count) {
-  let isChat = false
-  if (model === 'gpt-3.5-turbo') {
-    isChat = true
-  }
-
+  let isChat = chatModels.includes(model)
+  
   let instruction = 'Please type your commit command with the message below:'
   if (messageHint) {
     instruction = `Please use an additional hint for your commit message. It may help you to write a better message.\n`
@@ -191,8 +194,11 @@ async function main(argv) {
   }
   const verbose = argv.includes('--verbose')
   let def = 0
-  if (argv.includes('--old')) {
+  if (argv.includes('--gpt4')) {
     def = 1
+  }
+  if (argv.includes('--old')) {
+    def = 2
   }
   let model = argv.includes('--model') ? argv[argv.indexOf('--model') + 1] : models[def]
   if (!models.includes(model)) {
