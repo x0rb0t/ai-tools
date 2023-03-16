@@ -376,6 +376,7 @@ function print_usage() {
   console.log('  --verbose        Print more information')
   console.log('  --count <count>  Generate multiple commit messages')
   console.log('  --old            Dont use chat model, use old model')
+  console.log('  --gpt4           Use GPT-4 model')
   console.log('  --help           Print this help')
 }
 
