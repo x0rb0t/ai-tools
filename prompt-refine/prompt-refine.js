@@ -292,7 +292,13 @@ async function main(argv) {
       return
     }
     variants = result.map((r) => r.output)
-    readline.question('Do you wish to select the best variant? (y/n): ', funcStep2)
+    readline.question('Do you wish to select the best variant or refine with new variants? (y/r/n): ', (action) => {
+      if (action === 'r') {
+        funcStep1('y')
+      } else {
+        funcStep2(action)
+      }
+    })
   }
   funcStep2 = async (action) => {
     if (action !== 'y') {
