@@ -40,34 +40,38 @@ const chatModels = [
   'gpt-4',
 ]
 
-const PROMPT_TEMPLATE = `### Task: Write a git commit message describing the changes made to the following files:
+const PROMPT_TEMPLATE = `
+Write a clear and informative git commit message describing changes made to certain files. As an experienced software developer, you know that a well-crafted commit message is essential for maintaining a clean and organized project history. A good commit message should be short, yet informative, describing the changes made in a concise manner. Examples of effective commit messages are "Update README with installation instructions" or "Fix bug in user registration process".
 
+### Task:
+Write a git commit message describing the changes made to the following files:
+
+### Changes:
 %CHANGES%
-
-### As an experienced software developer, you know that a good commit message is short, yet informative. Please write a message that succinctly describes the changes made. 
+### End of changes
 
 %INSTRUCTION%
-
----
 
 %SUFFIX%`
 
 async function runCompletion(changes, messageHint, model, count) {
   let isChat = chatModels.includes(model)
   
-  let instruction = 'Please type your commit command with the message below:'
+  let instruction = ''
   if (messageHint) {
-    instruction = `Please use an additional hint for your commit message. It may help you to write a better message.\n`
-                + `Please describe the changes made in your commit message.\n`
-                + `### Message hint:\n\n`
-                + `${messageHint}\n\n`
-                + `### End of message hint.\n`
-                + 'Please type your commit command with the message below:'
+    instruction = `To help you craft a better commit message, please use the additional hint provided below:
+    ### Message hint:
+    ${messageHint}
+    ### End of message hint`
   }
   const input = PROMPT_TEMPLATE
                 .replace('%INSTRUCTION%', instruction)
                 .replace('%SUFFIX%', isChat 
-                     ? '### Write your commit command below in format "git commit -m \"<message>\"":'
+                     ? 'Once you have crafted your commit message, type your git commit command in the format below:\n'
+                        + '```\n'
+                        + 'git commit -m "<message>"\n'
+                        + "```\n"
+                        + 'Please replace "<message>" with your actual commit message. Keep in mind that the goal is to create a clear and informative commit message that describes the changes made.'
                      : 'git commit -m "')
                 .replace('%CHANGES%', changes)
               
