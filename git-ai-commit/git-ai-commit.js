@@ -60,9 +60,9 @@ async function runCompletion(changes, messageHint, model, count) {
   let instruction = ''
   if (messageHint) {
     instruction = `To help you craft a better commit message, please use the additional hint provided below:
-    ### Message hint:
-    ${messageHint}
-    ### End of message hint`
+### Message hint:
+${messageHint}
+### End of message hint`
   }
   const input = PROMPT_TEMPLATE
                 .replace('%INSTRUCTION%', instruction)
@@ -75,7 +75,7 @@ async function runCompletion(changes, messageHint, model, count) {
                      : 'git commit -m "')
                 .replace('%CHANGES%', changes)
               
-                
+  //console.log(`Running completion with:\n ${input}`)              
                                 
   let result = []
   try {
@@ -92,8 +92,7 @@ async function runCompletion(changes, messageHint, model, count) {
     }
     if (isChat) {
       params.messages = [
-        {"role": "system", "content": "You are a software developer. You are writing a commit message for a git commit. Your answer should be a git commit command in format \"git commit -m \"<message>\"\"."},
-        {"role": "user", "content":  input},
+        {"role": "system", "content": input},
       ]
       params.temperature = 0.8
       params.max_tokens = 256
