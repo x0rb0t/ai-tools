@@ -133,7 +133,8 @@ class RefineAgent extends Agent {
     }
     const separator = `HERE IS THE FINAL OUTPUT 0x${randomBytes(4).toString('hex')}`
     const booster_prepared = this.booster.replace(/%SEPARATOR%/g, `*${separator}*:`)
-    const entropy_prepared = this.entropy.replace(/%RANDOM_HEX_STRING%/g, randomBytes(128).toString('hex'))
+    const randString = randomBytes(128).toString('hex').match(/.{1,4}/g).join(' ')
+    const entropy_prepared = this.entropy.replace(/%RANDOM_HEX_STRING%/g, randString)
     const inputs = [
       entropy_prepared,
       `#HERE INPUT FOR THE TASK#:\n${JSON.stringify(input_format, null, 2)}`,
@@ -185,7 +186,8 @@ class CompareAgent extends Agent {
     }))
     const separator = `HERE IS THE FINAL OUTPUT 0x${randomBytes(4).toString('hex')}`
     const booster_prepared = this.booster.replace(/%SEPARATOR%/g, `*${separator}*:`)
-    const entropy_prepared = this.entropy.replace(/%RANDOM_HEX_STRING%/g, randomBytes(128).toString('hex'))
+    const randString = randomBytes(128).toString('hex').match(/.{1,4}/g).join(' ')
+    const entropy_prepared = this.entropy.replace(/%RANDOM_HEX_STRING%/g, randString)
     const inputs = [
       entropy_prepared,
       `#HERE INPUT FOR THE TASK#:\n${JSON.stringify(prompts, null, 2)}`,
