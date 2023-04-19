@@ -103,17 +103,18 @@ class Agent {
 
 //class RefineAgent
 class RefineAgent extends Agent {
-  constructor(prompt, booster, model = 'gpt-3.5-turbo', count = 1, max_tokens = 256, temperature = 0.8, top_p = 1) {
+  constructor(prompt, booster, entropy, model = 'gpt-3.5-turbo', count = 1, max_tokens = 256, temperature = 0.8, top_p = 1) {
     super(prompt, model, count, max_tokens, temperature, top_p)
     this.booster = booster
+    this.entropy = entropy
   }
 
   //create from a prompt file (it is near the script, prompt-refine.md)
   static createFromFile(model, count = 1, max_tokens = 256, temperature = 0.8) {
     const data = fs.readFileSync(__dirname + '/prompt-refine.md', 'utf8')
     const booster = fs.readFileSync(__dirname + '/prompt-refine-booster.md', 'utf8')
-   
-    return new RefineAgent(data, booster, model, count, max_tokens, temperature)
+    const entropy = fs.readFileSync(__dirname + '/prompt-entropy.md', 'utf8')
+    return new RefineAgent(data, booster, entropy, model, count, max_tokens, temperature)
   }
 
 
@@ -132,8 +133,10 @@ class RefineAgent extends Agent {
     }
     const separator = `HERE IS THE FINAL OUTPUT 0x${randomBytes(4).toString('hex')}`
     const booster_prepared = this.booster.replace(/%SEPARATOR%/g, `*${separator}*:`)
+    const entropy_prepared = this.entropy.replace(/%RANDOM_HEX_STRING%/g, randomBytes(128).toString('hex'))
     const inputs = [
-      `*HERE IS YOUR INPUT*:\n${JSON.stringify(input_format)}`, //instructions
+      entropy_prepared,
+      `#HERE INPUT FOR THE TASK#:\n${JSON.stringify(input_format, null, 2)}`,
       booster_prepared,
     ]
     const outputs = await this.run(inputs)
@@ -160,16 +163,18 @@ class RefineAgent extends Agent {
 }
 
 class CompareAgent extends Agent {
-  constructor(prompt, booster, model = 'gpt-3.5-turbo', count = 1, max_tokens = 256, temperature = 0.8, top_p = 1) {
+  constructor(prompt, booster, entropy, model = 'gpt-3.5-turbo', count = 1, max_tokens = 256, temperature = 0.8, top_p = 1) {
     super(prompt, model, count, max_tokens, temperature, top_p)
     this.booster = booster
+    this.entropy = entropy
   }
 
   //create from a prompt file (it is near the script, prompt-compare.md)
   static createFromFile(model, count = 1, max_tokens = 256, temperature = 0.8) {
     const data = fs.readFileSync(__dirname + '/prompt-compare.md', 'utf8')
     const booster = fs.readFileSync(__dirname + '/prompt-refine-booster.md', 'utf8')
-    return new CompareAgent(data, booster, model, count, max_tokens, temperature)
+    const entropy = fs.readFileSync(__dirname + '/prompt-entropy.md', 'utf8')
+    return new CompareAgent(data, booster,entropy,  model, count, max_tokens, temperature)
   }
 
   
@@ -180,8 +185,10 @@ class CompareAgent extends Agent {
     }))
     const separator = `HERE IS THE FINAL OUTPUT 0x${randomBytes(4).toString('hex')}`
     const booster_prepared = this.booster.replace(/%SEPARATOR%/g, `*${separator}*:`)
+    const entropy_prepared = this.entropy.replace(/%RANDOM_HEX_STRING%/g, randomBytes(128).toString('hex'))
     const inputs = [
-      `*HERE IS YOUR INPUT*:\n${JSON.stringify(prompts)}`, //instructions
+      entropy_prepared,
+      `#HERE INPUT FOR THE TASK#:\n${JSON.stringify(prompts, null, 2)}`,
       booster_prepared,
     ]
     const outputs = await this.run(inputs)
