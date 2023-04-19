@@ -266,12 +266,12 @@ async function main(argv) {
     return { status, filename, line }
   }).filter(file => file)
   if (verbose) {
-    console.log(`Found ${files.length} files with changes`)
+    console.log(`Found ${files.length} files with changes`);
   }
   if (files.length === 0) {
-    console.log('No changes to commit')
-    process.exit(0)
-    return
+    console.log('No changes to commit');
+    process.exit(0);
+    return;
   }
 
   const changesFilesString = files.map(file => {
@@ -280,17 +280,18 @@ async function main(argv) {
 
   //exec git diff for each file
   const changes = await Promise.all(files.map(async file => {
-    const { stdout, stderr } = await execPromise(`git diff --color=never --staged "${rootPath}/${file.filename}"`);
-    if (stderr) {
-      console.log(`error: ${stderr}`);
-      return;
+    try {
+      const { stdout } = await execPromise(`git diff --color=never --staged "${rootPath}/${file.filename}"`);
+      return {
+        filename: file.filename,
+        content: stdout,
+        estimated_tokens: estimateTokenCount(stdout),
+      };
+    } catch (e) {
+      //ignore
+      return null
     }
-    return {
-      filename: file.filename,
-      content: stdout,
-      estimated_tokens: estimateTokenCount(stdout)
-    }
-  }))
+  })).then(res => res.filter(file => file));
 
   changes.sort((a, b) => a.estimated_tokens - b.estimated_tokens)
 
