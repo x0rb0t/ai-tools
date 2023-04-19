@@ -168,25 +168,40 @@ async function runMultiple(changesString, hint, model, count) {
 }
 
 function estimateTokenCount(string) {
-  //estimate token count, wihout splitting the string
-  const k = 0.5
-  const n = string.length
-  return Math.round(k * n)
+  const wordRegex = /\w+/g;
+  const whitespaceRegex = /\s+/g;
+
+  const wordTokens = string.match(wordRegex) || [];
+  const whitespaceTokens = string.match(whitespaceRegex) || [];
+
+  return wordTokens.length + whitespaceTokens.length;
 }
 
 
 function truncateToEstimated(string, max_tokens) {
-  const k = 0.5
-  let result = string
-  if (string.length > max_tokens / k) {
-    result = string.substring(0, max_tokens)
-    if (result.length > 0) {
-      result += '\n<truncated>'
-    } else {
-      result = '<truncated>'
+  let tokens = 0;
+  let index = 0;
+  let lastSpaceIndex = -1;
+
+  while (index < string.length && tokens < max_tokens) {
+    const char = string[index];
+    if (char === ' ' || char === '\n' || char === '\t' || char === '\r') {
+      tokens++;
+      lastSpaceIndex = index;
+    } else if (index === 0 || string[index - 1] === ' ' || string[index - 1] === '\n' || string[index - 1] === '\t' || string[index - 1] === '\r') {
+      tokens++;
     }
+    index++;
   }
-  return result
+
+  if (index < string.length) {
+    if (lastSpaceIndex !== -1) {
+      return string.slice(0, lastSpaceIndex) + ' <truncated>';
+    }
+    return string.slice(0, index - 1) + '<truncated>';
+  }
+
+  return string;
 }
 
 async function main(argv) {
