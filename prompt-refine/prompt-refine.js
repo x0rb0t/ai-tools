@@ -3,12 +3,9 @@
 //Input: a prompt file (ex. prompt.md or prompt.txt), optional goal (def. "Improve and expand the prompt")
 
 const { Configuration, OpenAIApi } = require("openai");
-const { exec } = require("child_process");
 const fs = require('fs')
-//promisify exec
-const util = require("util");
 const { randomBytes } = require("crypto");
-const execPromise = util.promisify(exec);
+const { Agent } = require('../common/agent')
 
 //readline
 const readline = require('readline').createInterface({
@@ -28,83 +25,10 @@ const chatModels = [
   'gpt-4',
 ]
 
-//error class
-class PromptRefineError extends Error {
-  constructor(message) {
-    super(message)
-    this.name = 'PromptRefineError'
-  }
-}
-//Retry error class
-class RetryError extends PromptRefineError {
-  constructor(message) {
-    super(message)
-    this.name = 'RetryError'
-  }
-}
-
-class Agent {
-  constructor(prompt, model = 'gpt-3.5-turbo', count = 1, max_tokens = 256, temperature = 0.8, top_p = 1) {
-    this.prompt = prompt
-    this.model = model
-    this.count = count
-    this.max_tokens = max_tokens
-    this.temperature = temperature
-    this.top_p = top_p
-  }
-
-  //static function to load from a prompt file
-  static createFromFile(path, model) {
-    //read the file
-    const data = fs.readFileSync(path, 'utf8')
-    return new Agent(data, model)
-  }
-  
-  //function to prepare input data to the prompt
-  prepareInput(inputs) {
-    return [{
-        role: 'system',
-        content: this.prompt,
-      }, ...inputs.map(input => ({
-        role: 'user',
-        content: input,
-      }))]
-  }
-
-  //virtual function to process the output of the prompt
-  //throw RetryError to retry the prompt
-  processOutput(choices) {
-    return choices.map((choice) => choice.message.content.trim())
-  }
-
-  //virtual function to get aopeai arguments
-  getOpenAIArgs() {
-    return {
-      model: this.model,
-      temperature: this.temperature,
-      max_tokens: this.max_tokens,
-      top_p: this.top_p,
-      n: this.count,
-    }
-  }
-
-  //function to run the prompt
-  //inputs: array of strings
-  //returns: array of strings
-  async run(inputs) {
-    const input = this.prepareInput(inputs)
-    const params = this.getOpenAIArgs()
-    params.messages = input
-    const response = await openai.createChatCompletion(params)
-    const output = this.processOutput(response.data.choices)
-    return output
-  }
-}
-
 //class RefineAgent
 class RefineAgent extends Agent {
   constructor(prompt, booster, entropy, model = 'gpt-3.5-turbo', count = 1, max_tokens = 256, temperature = 0.8, top_p = 1) {
-    super(prompt, model, count, max_tokens, temperature, top_p)
+    super(openai, prompt, model, count, max_tokens, temperature, top_p)
     this.booster = booster
     this.entropy = entropy
   }
@@ -113,7 +37,7 @@ class RefineAgent extends Agent {
   static createFromFile(model, count = 1, max_tokens = 256, temperature = 0.8) {
     const data = fs.readFileSync(__dirname + '/prompt-refine.md', 'utf8')
     const booster = fs.readFileSync(__dirname + '/prompt-refine-booster.md', 'utf8')
-    const entropy = fs.readFileSync(__dirname + '/prompt-entropy.md', 'utf8')
+    const entropy = fs.readFileSync(__dirname + '/../common/prompt-entropy.md', 'utf8')
     return new RefineAgent(data, booster, entropy, model, count, max_tokens, temperature)
   }
 
@@ -165,7 +89,7 @@ class RefineAgent extends Agent {
 
 class CompareAgent extends Agent {
   constructor(prompt, booster, entropy, model = 'gpt-3.5-turbo', count = 1, max_tokens = 256, temperature = 0.8, top_p = 1) {
-    super(prompt, model, count, max_tokens, temperature, top_p)
+    super(openai, prompt, model, count, max_tokens, temperature, top_p)
     this.booster = booster
     this.entropy = entropy
   }
@@ -174,7 +98,7 @@ class CompareAgent extends Agent {
   static createFromFile(model, count = 1, max_tokens = 256, temperature = 0.8) {
     const data = fs.readFileSync(__dirname + '/prompt-compare.md', 'utf8')
     const booster = fs.readFileSync(__dirname + '/prompt-refine-booster.md', 'utf8')
-    const entropy = fs.readFileSync(__dirname + '/prompt-entropy.md', 'utf8')
+    const entropy = fs.readFileSync(__dirname + '/../common/prompt-entropy.md', 'utf8')
     return new CompareAgent(data, booster,entropy,  model, count, max_tokens, temperature)
   }
 
@@ -274,7 +198,7 @@ async function main(argv) {
 
   const refineAgent = RefineAgent.createFromFile(model, rays, 2048, 0.8)
   const compareAgent = CompareAgent.createFromFile(model, rays, 2048, 0.8)
-  const target = Agent.createFromFile(input, model)
+  const target = Agent.createFromFile(openai, input, model)
   console.log(target.prompt)
   
   var variants = []
