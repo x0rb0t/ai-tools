@@ -1,8 +1,8 @@
 {
-  "name": "git-ai-commit",
+  "name": "ai-chat",
   "version": "1.0.0",
   "description": "",
-  "main": "git-ai-commit.js",
+  "main": "ai-chat.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
   },
