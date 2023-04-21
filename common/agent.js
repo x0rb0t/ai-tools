@@ -2,6 +2,9 @@
 const fs = require('fs')
 class Agent {
   constructor(openai, prompt, model = 'gpt-3.5-turbo', count = 1, max_tokens = 256, temperature = 0.8, top_p = 1) {
+    if (!openai || !prompt) {
+      throw new Error('OpenAI and prompt parameters are required');
+    }
     this.openai = openai
     this.prompt = prompt
     this.model = model
@@ -20,24 +23,22 @@ class Agent {
   
   //function to prepare input data to the prompt
   prepareInput(inputs) {
-    return [{
-        role: 'system',
-        content: this.prompt,
-      }, ...inputs.map(input => {
+    if (!Array.isArray(inputs)) {
+      throw new Error('Inputs must be an array');
+    }
+
+    return [
+      { role: 'system', content: this.prompt },
+      ...inputs.map((input) => {
         if (typeof input === 'string') {
-          return {
-            role: 'user',
-            content: input,
-          }
+          return { role: 'user', content: input };
         } else if (typeof input === 'object') {
-          return {
-            role: input.role,
-            content: input.content,
-          }
+          return { role: input.role, content: input.content };
         } else {
-          throw new Error('Invalid input type')
+          throw new Error('Invalid input type');
         }
-      })]
+      }),
+    ];
   }
 
   //virtual function to process the output of the prompt
