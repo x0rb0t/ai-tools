@@ -7,6 +7,7 @@ const fs = require('fs')
 const { randomBytes } = require("crypto");
 const { Agent } = require('../common/agent')
 
+const GOLDEN_RATIO_INV = 0.618033988749895
 //readline
 const readline = require('readline').createInterface({
   input: process.stdin,
@@ -27,18 +28,18 @@ const chatModels = [
 
 //class RefineAgent
 class RefineAgent extends Agent {
-  constructor(prompt, booster, entropy, model = 'gpt-3.5-turbo', count = 1, max_tokens = 256, temperature = 0.8, top_p = 1) {
+  constructor(prompt, booster, entropy, model = 'gpt-3.5-turbo', count = 1, max_tokens = 256, temperature = GOLDEN_RATIO_INV, top_p = GOLDEN_RATIO_INV) {
     super(openai, prompt, model, count, max_tokens, temperature, top_p)
     this.booster = booster
     this.entropy = entropy
   }
 
   //create from a prompt file (it is near the script, prompt-refine.md)
-  static createFromFile(model, count = 1, max_tokens = 256, temperature = 0.8) {
+  static createFromFile(model, count = 1, max_tokens = 256, temperature = GOLDEN_RATIO_INV, top_p = GOLDEN_RATIO_INV) {
     const data = fs.readFileSync(__dirname + '/prompt-refine.md', 'utf8')
     const booster = fs.readFileSync(__dirname + '/prompt-refine-booster.md', 'utf8')
     const entropy = fs.readFileSync(__dirname + '/../common/prompt-entropy.md', 'utf8')
-    return new RefineAgent(data, booster, entropy, model, count, max_tokens, temperature)
+    return new RefineAgent(data, booster, entropy, model, count, max_tokens, temperature, top_p)
   }
 
 
@@ -55,7 +56,7 @@ class RefineAgent extends Agent {
       prompts: prompts,
       objective: objective,
     }
-    const separator = `HERE IS THE FINAL OUTPUT 0x${randomBytes(4).toString('hex')}`
+    const separator = `#OUTPUT_${randomBytes(8).toString('hex')}_SEPARATOR#`
     const booster_prepared = this.booster.replace(/%SEPARATOR%/g, `*${separator}*:`)
     const randString = randomBytes(128).toString('hex').match(/.{1,4}/g).join(' ')
     const entropy_prepared = this.entropy.replace(/%RANDOM_HEX_STRING%/g, randString)
@@ -88,18 +89,18 @@ class RefineAgent extends Agent {
 }
 
 class CompareAgent extends Agent {
-  constructor(prompt, booster, entropy, model = 'gpt-3.5-turbo', count = 1, max_tokens = 256, temperature = 0.8, top_p = 1) {
+  constructor(prompt, booster, entropy, model = 'gpt-3.5-turbo', count = 1, max_tokens = 256, temperature = GOLDEN_RATIO_INV, top_p = GOLDEN_RATIO_INV) {
     super(openai, prompt, model, count, max_tokens, temperature, top_p)
     this.booster = booster
     this.entropy = entropy
   }
 
   //create from a prompt file (it is near the script, prompt-compare.md)
-  static createFromFile(model, count = 1, max_tokens = 256, temperature = 0.8) {
+  static createFromFile(model, count = 1, max_tokens = 256, temperature = GOLDEN_RATIO_INV, top_p = GOLDEN_RATIO_INV) {
     const data = fs.readFileSync(__dirname + '/prompt-compare.md', 'utf8')
     const booster = fs.readFileSync(__dirname + '/prompt-refine-booster.md', 'utf8')
     const entropy = fs.readFileSync(__dirname + '/../common/prompt-entropy.md', 'utf8')
-    return new CompareAgent(data, booster,entropy,  model, count, max_tokens, temperature)
+    return new CompareAgent(data, booster,entropy,  model, count, max_tokens, temperature, top_p)
   }
 
   
@@ -108,7 +109,7 @@ class CompareAgent extends Agent {
       prompt_id: index,
       prompt: compare_prompt,
     }))
-    const separator = `HERE IS THE FINAL OUTPUT 0x${randomBytes(4).toString('hex')}`
+    const separator = `#OUTPUT_${randomBytes(8).toString('hex')}_SEPARATOR#`
     const booster_prepared = this.booster.replace(/%SEPARATOR%/g, `*${separator}*:`)
     const randString = randomBytes(128).toString('hex').match(/.{1,4}/g).join(' ')
     const entropy_prepared = this.entropy.replace(/%RANDOM_HEX_STRING%/g, randString)
@@ -155,7 +156,7 @@ class CompareAgent extends Agent {
   }
 }
 
-
+const DEFAULT_OBJECTIVE = 'Please enhance the clarity of the prompt, ensuring that it is easily understandable for an AI agent. Additionally, if necessary, expand or condense the prompt to provide a more detailed explanation of the task.'
 async function main(argv) {
   if (argv.includes('--help')) {
     print_usage()
@@ -177,8 +178,7 @@ async function main(argv) {
     return
   }
   //get goal
-  let objective = argv.includes('--objective') ? argv[argv.indexOf('--objective') + 1] : 'Please, make the prompt more clear for an AI agent to understand and follow. Also expand the prompt to explain the task in more detail.'
-
+  let objective = argv.includes('--objective') ? argv[argv.indexOf('--objective') + 1] : DEFAULT_OBJECTIVE
   if (process.env.OPENAI_API_KEY === undefined) {
     console.error('Please set OPENAI_API_KEY environment variable')
     process.exit(0)
@@ -266,9 +266,9 @@ async function main(argv) {
     const original_id = variants.length
     for (let i in inputs) {
       if (i == original_id) {
-        variants_combined.push({variant: inputs[i], rating: ratings[i], original: true})
+        variants_combined.push({variant: inputs[i], rating: ratings[i], original: true, id: i})
       } else {
-        variants_combined.push({variant: inputs[i], rating: ratings[i], original: false})
+        variants_combined.push({variant: inputs[i], rating: ratings[i], original: false, id: i})
       }
     }
 
@@ -278,12 +278,12 @@ async function main(argv) {
     for (let i in variants_combined) {
       if (variants_combined[i].original) {
         console.log("==============ORIGINAL==============")
-        console.log(`Original variant:\n${variants_combined[i].variant}`)
+        console.log(`Original variant (#${variants_combined[i].id}):\n${variants_combined[i].variant}`)
         console.log(`Rating: ${variants_combined[i].rating}`)
         console.log("=====================================")
       } else {
         console.log("=====================================")
-        console.log(`Variant ${i}:\n${variants_combined[i].variant}`)
+        console.log(`Variant #${variants_combined[i].id}:\n${variants_combined[i].variant}`)
         console.log(`Rating: ${variants_combined[i].rating}`)
         console.log("=====================================")
       }
@@ -293,7 +293,7 @@ async function main(argv) {
   
     if (variants_filtered.length === 0) {
       console.log('No variants left, exiting...')
-      process.exit(0)
+      readline.question('Do you wish to try again ? (y/n): ', funcStep2)
     }
     const max_count = Math.ceil(rays*1.5)
     if (variants_filtered.length > max_count) {
@@ -314,8 +314,7 @@ function print_usage() {
   console.log('  --help: print this help message')
   console.log('  --verbose: print more information')
   console.log('  --model: specify the model to use (default: gpt-4)')
-  console.log('  --objective: specify the objective to use (default: Please, make the prompt more clear for an AI agent to understand and follow. Also expand the prompt to explain the task in more detail.)')
-  console.log('  --rays: specify the number of rays to use (default: 2)')
+  console.log('  --objective: specify the objective to use (default: "' + DEFAULT_OBJECTIVE + '")')
   console.log('  --input: specify the input file to use')
   
 }
