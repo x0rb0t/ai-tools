@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AI Chat Tool</title>
+
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@4.5.2/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-vue@2.21.2/dist/bootstrap-vue.min.css" rel="stylesheet">
+  
+  <script src="https://cdn.jsdelivr.net/npm/vue@2.6.14/dist/vue.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap-vue@2.21.2/dist/bootstrap-vue.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/vue-functional-data-merge@3.9.2"></script>
+</head>
+<body>
+  <div id="app">
+    <b-container>
+      <b-row>
+        <b-col>
+          <h3>System Prompt Selection</h3>
+          <b-form-textarea placeholder="Select or enter a system prompt"></b-form-textarea>
+        </b-col>
+
+        <b-col>
+          <h3>Editable Messages</h3>
+          <message-list></message-list>
+        </b-col>
+
+        <b-col>
+          <h3>Agent Configuration</h3>
+          <agent-config></agent-config>
+        </b-col>
+      </b-row>
+    </b-container>
+  </div>
+
+  <script>
+    Vue.component('message-list', {
+      template: '#message-list-template'
+    });
+
+    Vue.component('agent-config', {
+      template: '#agent-config-template'
+    });
+
+    new Vue({
+      el: '#app'
+    });
+  </script>
+
+  <script type="text/x-template" id="message-list-template">
+    <div>
+      <!-- Add your editable messages components here -->
+    </div>
+  </script>
+
+  <script type="text/x-template" id="agent-config-template">
+    <div>
+      <b-form-group label="Temperature">
+        <b-form-input type="range" min="0" max="1" step="0.01" v-model="temperature"></b-form-input>
+      </b-form-group>
+
+      <b-form-group label="Top K">
+        <b-form-input type="range" min="1" max="100" step="1" v-model="topK"></b-form-input>
+      </b-form-group>
+
+      <!-- Add any other agent-specific components here -->
+    </div>
+  </script>
+</body>
+</html>

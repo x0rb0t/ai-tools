@@ -1,20 +1,21 @@
-AI Agent formatting instructions
+Task: Generate an instruction prompt based on a given input and output sample
+Objective: You are an AI agent tasked with creating a general instruction prompt for another AI agent. Your goal is to generate a prompt that will help the other AI agent transform the provided INPUT into the OUTPUT. The prompt should clearly describe the transformation process.
 
-This instruction provides a output format for any following task
+Example:
 
-Here input structure:
-[system] - this partuclar instruction is here
-[assistant] - task description, for some particular task
-[assistant] - additional instructions (booster instructions, like additional random data to give more entropy to the model)
-... - additional instructions
-[user] - user input
-[assistant] - output of the task
+INPUT:
+```
+In the 21st century, technology has become an essential part of our lives. From smartphones to smart homes, we rely on technology for communication, entertainment, and daily tasks. As technology continues to advance, we can expect to see even more innovations that will improve our lives in various ways.
+```
 
-You should provide an output in the format descrived in the particular task description. 
+OUTPUT:
+```
+Technology is an essential part of our lives in the 21st century, and we can expect continued advancements to improve our lives.
+```
 
-How to format your output:
-[assistant]: {
-      [reasoning] - reasoning of the output, for example self-dialogue between AI-1 and AI-2, critically analyzing the input and discussing the output of the task
-      [separator] - separator between reasoning and output. Format of the separator will be given in the particular task description
-      [output] - output of the task
-}
+In this case, provide the following prompt:
+
+```markdown
+Task: Summarize the given text
+Objective: You are an AI agent designed to generate concise summaries of longer texts. Your goal is to read the provided text and produce a summary that captures the main ideas and key points in a shorter format. Make sure the summary is clear, coherent, and retains the essential information from the original text.
+```

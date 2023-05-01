@@ -7,7 +7,9 @@ const fs = require('fs')
 const { randomBytes } = require("crypto");
 const { Agent } = require('../common/agent')
 
-const GOLDEN_RATIO_INV = 0.618033988749895
+//const GOLDEN_RATIO_INV = 0.618033988749895
+const TEMPERATURE = 0.8
+const TOP_P = 0.95
 //readline
 const readline = require('readline').createInterface({
   input: process.stdin,
@@ -28,14 +30,14 @@ const chatModels = [
 
 //class RefineAgent
 class RefineAgent extends Agent {
-  constructor(prompt, booster, entropy, model = 'gpt-3.5-turbo', count = 1, max_tokens = 256, temperature = GOLDEN_RATIO_INV, top_p = GOLDEN_RATIO_INV) {
+  constructor(prompt, booster, entropy, model = 'gpt-3.5-turbo', count = 1, max_tokens = 256, temperature = TEMPERATURE, top_p = TOP_P) {
     super(openai, prompt, model, count, max_tokens, temperature, top_p)
     this.booster = booster
     this.entropy = entropy
   }
 
   //create from a prompt file (it is near the script, prompt-refine.md)
-  static createFromFile(model, count = 1, max_tokens = 256, temperature = GOLDEN_RATIO_INV, top_p = GOLDEN_RATIO_INV) {
+  static createFromFile(model, count = 1, max_tokens = 256, temperature = TEMPERATURE, top_p = TOP_P) {
     const data = fs.readFileSync(__dirname + '/prompt-refine.md', 'utf8')
     const booster = fs.readFileSync(__dirname + '/prompt-refine-booster.md', 'utf8')
     const entropy = fs.readFileSync(__dirname + '/../common/prompt-entropy.md', 'utf8')
@@ -89,14 +91,14 @@ class RefineAgent extends Agent {
 }
 
 class CompareAgent extends Agent {
-  constructor(prompt, booster, entropy, model = 'gpt-3.5-turbo', count = 1, max_tokens = 256, temperature = GOLDEN_RATIO_INV, top_p = GOLDEN_RATIO_INV) {
+  constructor(prompt, booster, entropy, model = 'gpt-3.5-turbo', count = 1, max_tokens = 256, temperature = TEMPERATURE, top_p = TOP_P) {
     super(openai, prompt, model, count, max_tokens, temperature, top_p)
     this.booster = booster
     this.entropy = entropy
   }
 
   //create from a prompt file (it is near the script, prompt-compare.md)
-  static createFromFile(model, count = 1, max_tokens = 256, temperature = GOLDEN_RATIO_INV, top_p = GOLDEN_RATIO_INV) {
+  static createFromFile(model, count = 1, max_tokens = 256, temperature = TEMPERATURE, top_p = TOP_P) {
     const data = fs.readFileSync(__dirname + '/prompt-compare.md', 'utf8')
     const booster = fs.readFileSync(__dirname + '/prompt-refine-booster.md', 'utf8')
     const entropy = fs.readFileSync(__dirname + '/../common/prompt-entropy.md', 'utf8')
@@ -178,7 +180,7 @@ async function main(argv) {
     return
   }
   //get goal
-  let objective = argv.includes('--objective') ? argv[argv.indexOf('--objective') + 1] : DEFAULT_OBJECTIVE
+  var objective = argv.includes('--objective') ? argv[argv.indexOf('--objective') + 1] : DEFAULT_OBJECTIVE
   if (process.env.OPENAI_API_KEY === undefined) {
     console.error('Please set OPENAI_API_KEY environment variable')
     process.exit(0)
@@ -226,7 +228,13 @@ async function main(argv) {
     }
     variants = result.map((r) => r.output)
     readline.question('Do you wish to select the best variant or refine with new variants? (y/r/n): ', (action) => {
-      if (action === 'r') {
+      if (action.startsWith('r')) {
+        //if string is "r\snew objective"
+        const split = action.split(' ')
+        if (split.length > 1) {
+          objective = split.slice(1).join(' ')
+          console.log(`New objective: ${objective}`)
+        }
         funcStep1('y')
       } else {
         funcStep2(action)
@@ -301,7 +309,19 @@ async function main(argv) {
       variants_filtered.splice(max_count)
     }
     variants = variants_filtered.map((v) => v.variant)
-    readline.question('Do you wish to interate again ? (y/n): ', funcStep1)
+    readline.question('Do you wish to interate again ? (y/n): ', action => {
+      if (action.startsWith('y')) {
+        const split = action.split(' ')
+        if (split.length > 1) {
+          objective = split.slice(1).join(' ')
+          console.log(`New objective: ${objective}`)
+        }
+        funcStep1('y')
+      } else {
+        console.log('Exiting...')
+        process.exit(0)
+      }
+    })
   }
   
   funcStep1('y')
