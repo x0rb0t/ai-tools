@@ -7,9 +7,9 @@ const fs = require('fs')
 const { randomBytes } = require("crypto");
 const { Agent } = require('../common/agent')
 
-//const GOLDEN_RATIO_INV = 0.618033988749895
-const TEMPERATURE = 0.8
-const TOP_P = 0.95
+const GOLDEN_RATIO_INV = 0.618033988749895
+const TEMPERATURE = GOLDEN_RATIO_INV //0.8
+const TOP_P = GOLDEN_RATIO_INV // 0.95
 //readline
 const readline = require('readline').createInterface({
   input: process.stdin,
