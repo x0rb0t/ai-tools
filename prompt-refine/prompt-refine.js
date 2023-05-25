@@ -158,7 +158,7 @@ class CompareAgent extends Agent {
   }
 }
 
-const DEFAULT_OBJECTIVE = 'Please enhance the clarity of the prompt, ensuring that it is easily understandable for an AI agent. Additionally, if necessary, expand or condense the prompt to provide a more detailed explanation of the task.'
+const DEFAULT_OBJECTIVE = 'Please enhance the clarity and effectiveness of the prompt, ensuring that it is easily understandable for an AI agent. Additionally, if necessary, expand or condense the prompt to provide a more detailed explanation of the task.'
 async function main(argv) {
   if (argv.includes('--help')) {
     print_usage()
