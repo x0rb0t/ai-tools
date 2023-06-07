@@ -159,6 +159,17 @@ class CompareAgent extends Agent {
 }
 
 const DEFAULT_OBJECTIVE = 'Please enhance the clarity and effectiveness of the prompt, ensuring that it is easily understandable for an AI agent. Additionally, if necessary, expand or condense the prompt to provide a more detailed explanation of the task.'
+const objectives = {
+  'default': `Please enhance the clarity and effectiveness of the prompt, ensuring that it is easily understandable for an AI agent.
+  Additionally, if necessary, expand or condense the prompt to provide a more detailed explanation of the task.`,
+  'clarity': `Please enhance the clarity and effectiveness of the prompt, ensuring that it is easily understandable for an AI agent.`,
+  'expand': `Please expand the prompt to provide a more detailed explanation of the task.`,
+  'condense': `Please condense the prompt to provide a more concise explanation of the task.`,
+  'rethink': `Please paraphrase the prompt to provide a more effective explanation of the task.`,
+  'examples': `Please provide examples of the task to provide a more effective explanation of the task.`,
+  'adv': `Please enhance the clarity and effectiveness of the prompt, add/modify examples, paraphrase if required, ensuring that it is easily understandable for an AI agent.`,
+}
+
 async function main(argv) {
   if (argv.includes('--help')) {
     print_usage()
@@ -181,6 +192,12 @@ async function main(argv) {
   }
   //get goal
   var objective = argv.includes('--objective') ? argv[argv.indexOf('--objective') + 1] : DEFAULT_OBJECTIVE
+
+  // objective by code
+  if (objective in objectives) {
+    objective = objectives[objective]
+  }
+
   if (process.env.OPENAI_API_KEY === undefined) {
     console.error('Please set OPENAI_API_KEY environment variable')
     process.exit(0)
@@ -233,6 +250,9 @@ async function main(argv) {
         const split = action.split(' ')
         if (split.length > 1) {
           objective = split.slice(1).join(' ')
+          if (objective in objectives) {
+            objective = objectives[objective]
+          }
           console.log(`New objective: ${objective}`)
         }
         funcStep1('y')
@@ -314,6 +334,9 @@ async function main(argv) {
         const split = action.split(' ')
         if (split.length > 1) {
           objective = split.slice(1).join(' ')
+          if (objective in objectives) {
+            objective = objectives[objective]
+          }
           console.log(`New objective: ${objective}`)
         }
         funcStep1('y')
