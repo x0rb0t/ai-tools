@@ -1,5 +1,9 @@
 import { OpenAI } from "openai";
 import * as fs from 'fs'
+import yargs from 'yargs';
+import { hideBin } from 'yargs/helpers';
+import { flattenJSON, inflateJSON, chunkArray, flattenXML, inflateXML } from "./utils.js";
+
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
@@ -12,66 +16,6 @@ const chatModels = [
 ]
 
 const chatModel = chatModels[0]
-
-const flattenJSON = (data, prefix = '') => {
-  let result = {};
-  if (Array.isArray(data)) {
-    data.forEach((value, index) => {
-      const newKey = `${prefix}.[${index}]`;
-      if (typeof value === 'object' && value !== null) {
-        result = { ...result, ...flattenJSON(value, newKey) };
-      } else {
-        result[newKey] = value;
-      }
-    });
-  } else {
-    for (let key in data) {
-      const escapedKey = key.replace(/\[/g, '\\[').replace(/\]/g, '\\]');
-      const newKey = prefix ? `${prefix}.${escapedKey}` : escapedKey;
-      const value = data[key];
-      if (typeof value === 'object' && value !== null) {
-        result = { ...result, ...flattenJSON(value, newKey) };
-      } else {
-        result[newKey] = value;
-      }
-    }
-  }
-  return result;
-};
-
-
-const inflateJSON = (data) => {
-  let result = {};
-  for (let key in data) {
-    let value = data[key];
-    let keys = key.split('.').map(k => k.replace(/\\[\[\]]/g, match => match[1]));
-    let temp = result;
-    for (let i = 0; i < keys.length; i++) {
-      let nextKey = keys[i];
-      let isArrayIndex = /^\[\d+\]$/.test(nextKey);
-      let actualKey = isArrayIndex ? parseInt(nextKey.match(/\[(\d+)\]/)[1], 10) : nextKey;
-      let isLastElement = i === keys.length - 1;
-
-      if (isArrayIndex && !Array.isArray(temp)) {
-        temp = [];
-      }
-
-      if (isLastElement) {
-        temp[actualKey] = value;
-      } else {
-        if (temp[actualKey] === undefined) {
-          temp[actualKey] = /^\[\d+\]$/.test(keys[i + 1]) ? [] : {};
-        }
-        temp = temp[actualKey];
-      }
-    }
-    result = Array.isArray(result) ? Object.values(result) : result;
-  }
-  return result;
-};
-
-
-
 
 const LANG_MAP = {
   'en': 'English',
@@ -117,283 +61,265 @@ home.description = This is a home
 `;
 
 
+// Utility function to process keyValues and manage API call
+async function processKeyValues(model, keyValues, from, context, promptTemplate, actionDescription) {
+  if (!LANG_MAP[from]) {
+    throw new Error('Invalid language');
+  }
+  let prompt = promptTemplate.replace('%INPUT_LANG%', LANG_MAP[from]);
+  if (context) {
+    prompt = prompt.replace('%CONTEXT%', `${actionDescription} must be done in context of: '${context}'`);
+  }
+  const messages = [{"role": "system", "content": prompt}];
+  let inputMessage = keyValues.map(({ key, value }) =>
+    `${key} = ${value.replace(/\n/g, '\\n')}`
+  ).join('\n');
+
+  messages.push({"role": "user", "content": inputMessage});
+  messages.push({"role": "user", "content": "Your output must exclusively contain the key-value pairs separated by new line."});
+
+  const params = {
+    model: model,
+    n: 1,
+    max_tokens: 2048,
+    temperature: 0.7,
+    top_p: 0.9,
+    messages: messages
+  };
+  const retryCount = 3;
+  for (let i = 0; i < retryCount; i++) {
+    try {
+      const response = await openai.chat.completions.create(params);
+      const { choices } = response;
+      const { message } = choices[0];
+      const lines = message.content.split('\n');
+      return parseResponse(lines, keyValues);
+    } catch (error) {
+      if (i === retryCount - 1) {
+        console.error(`Failed to process:`, keyValues);
+        throw error;
+      }
+    }
+  }
+}
+
+// Utility function to parse the API response
+function parseResponse(lines, keyValues) {
+  const translatedKeyValues = [];
+  const originalKeySet = new Set(keyValues.map(({ key }) => key));
+  const duplicateKeySet = new Set();
+
+  lines.forEach(line => {
+    const index = line.indexOf('=');
+    if (index === -1) return;
+
+    const key = line.substring(0, index).trim();
+    if (!key || !originalKeySet.has(key) || duplicateKeySet.has(key)) return;
+
+    duplicateKeySet.add(key);
+    const value = line.substring(index + 1).trim();
+    translatedKeyValues.push({ key, value });
+  });
+
+  if (translatedKeyValues.length !== originalKeySet.size) {
+    console.error('Original keys:', originalKeySet);
+    console.error('Translated keys:', new Set(translatedKeyValues.map(({ key }) => key)));
+    throw new Error('Invalid response');
+  }
+
+  return translatedKeyValues;
+}
+
+// Refactored translate function
 const translate = async (model, keyValues, from, to, context) => {
-  const params = {
-    model: model,
-    n: 1,
-    max_tokens: 1024,
-    temperature: 0.7,
-    top_p: 0.9,
-  }
-  if (!LANG_MAP[from]) {
-    throw new Error('Invalid language')
-  }
   if (!LANG_MAP[to]) {
-    throw new Error('Invalid language')
+    throw new Error('Invalid language');
   }
-  let prompt = PROMPT_TEMPLATE
-    .replace('%INPUT_LANG%', LANG_MAP[from])
-    .replace('%OUTPUT_LANG%', LANG_MAP[to])
-  if (context) {
-    prompt = prompt.replace('%CONTEXT%', `Translation must be done in context of: '${context}'`)
-  }
-  const messages = [ {"role": "system", "content": prompt } ]
-  let input_message = ""
-  for (let i = 0; i < keyValues.length; i++) {
-    const { key, value } = keyValues[i]
-    //escape new line characters
-    const escapedValue = value.replace(/\n/g, '\\n')
-    input_message += `${key} = ${escapedValue}\n`
-  }
-  messages.push({"role": "user", "content": input_message})
-  messages.push({"role": "user", "content": "Your output must exclusively contain the translated key-value pairs separated by new line."})
-  params.messages = messages
-  const response = await openai.chat.completions.create(params)
-  const { choices } = response
-  //console.log(choices)
-  const { message } = choices[0]
-  //split by new line
-  const lines = message.content.split('\n')
-  const translatedKeyValues = []
-  const originalKeySet = new Set(keyValues.map(({ key }) => key))
-  const duplicateKeySet = new Set()
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i]
-    //index of '='
-    const index = line.indexOf('=')
-    if (index === -1) {
-      //skip this line
-      continue
-    }
-    const key = line.substring(0, index).trim()
-    if (!key || !originalKeySet.has(key)) {
-      continue
-    }
-    if (duplicateKeySet.has(key)) {
-      continue
-    }
-    duplicateKeySet.add(key)
-    const value = line.substring(index + 1).trim()
-    if (value) {
-      translatedKeyValues.push({ key, value })
-    }
-  }
-  if (translatedKeyValues.length !== originalKeySet.size) {
-    throw new Error('Invalid response')
-  }
-  return translatedKeyValues
-}
+  return await processKeyValues(model, keyValues, from, context, PROMPT_TEMPLATE.replace('%OUTPUT_LANG%', LANG_MAP[to]), 'Translation');
+};
 
+// Refactored fixGrammar function
 const fixGrammar = async (model, keyValues, from, context) => {
-  const params = {
-    model: model,
-    n: 1,
-    max_tokens: 1024,
-    temperature: 0.7,
-    top_p: 0.9,
-  }
-  if (!LANG_MAP[from]) {
-    throw new Error('Invalid language')
-  }
-  let prompt = FIX_GRAMMAR_PROMPT_TEMPLATE
-    .replace('%INPUT_LANG%', LANG_MAP[from])
-  if (context) {
-    prompt = prompt.replace('%CONTEXT%', `Grammar must be fixed in context of: '${context}'`)
-  }
-  const messages = [ {"role": "system", "content": prompt } ]
-  let input_message = ""
-  for (let i = 0; i < keyValues.length; i++) {
-    const { key, value } = keyValues[i]
-    //escape new line characters
-    const escapedValue = value.replace(/\n/g, '\\n')
-    input_message += `${key} = ${escapedValue}\n`
-  }
-  messages.push({"role": "user", "content": input_message})
-  messages.push({"role": "user", "content": "Your output must exclusively contain the translated key-value pairs separated by new line."})
-  params.messages = messages
-  const response = await openai.chat.completions.create(params)
-  const { choices } = response
-  //console.log(choices)
-  const { message } = choices[0]
-  //split by new line
-  const lines = message.content.split('\n')
-  const translatedKeyValues = []
-  const originalKeySet = new Set(keyValues.map(({ key }) => key))
-  const duplicateKeySet = new Set()
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i]
-    //index of '='
-    const index = line.indexOf('=')
-    if (index === -1) {
-      //skip this line
-      continue
-    }
-    const key = line.substring(0, index).trim()
-    if (!key || !originalKeySet.has(key)) {
-      continue
-    }
-    if (duplicateKeySet.has(key)) {
-      continue
-    }
-    duplicateKeySet.add(key)
-    const value = line.substring(index + 1).trim()
-    if (value) {
-      translatedKeyValues.push({ key, value })
-    }
-  }
-  if (translatedKeyValues.length !== originalKeySet.size) {
-    throw new Error('Invalid response')
-  }
-  return translatedKeyValues
-}
-
-const printHelp = () => {
-  console.log(`
-Usage:
-  translate-js [OPTIONS]
-
-Description:
-  Translates a JSON file from one language to another using OpenAI's language models. Can also fix grammar in the JSON file.
-
-Options:
-  --input <path>            Path to the input JSON file. [Required]
-  --from <lang>             Source language. Auto-detected if not specified.
-  --to <lang>               Target language. Required unless --fix-grammar is used.
-  --context <context>       Context for translation. [Optional]
-  --model <model>           OpenAI model for translation. Default: gpt-3.5-turbo
-  --verbose                 Enable verbose output.
-  --output <path>           Path to save the translated JSON. Defaults to stdout.
-  --chunk-size <size>       Number of key-value pairs to process in each API call. Default: 32
-  --fix-grammar             Fixes grammar without translating. Cannot be used with --to.
-  --dry-run                 Simulates translation without calling OpenAI API.
-  --help                    Show this help message and exit.
-
-Examples:
-  translate-js --input en.json --from en --to de --output de.json
-  translate-js --input en.json --fix-grammar --output en_fixed.json
-
-Note:
-  Make sure to set the OPENAI_API_KEY environment variable before running the command.
-
-  `);
+  return await processKeyValues(model, keyValues, from, context, FIX_GRAMMAR_PROMPT_TEMPLATE, 'Grammar fixing');
 };
 
 
 
-
-const main = async (argv) => {
-  //parse argv
-  // --file en.json --from en --to de --context "This is a DEX wallet app" --model gpt-3.5-turbo
-  let input, from, to, context, verbose, output, chunkSize = 32, fixGrammarMode = false, dryRun = false
-  for (let i = 0; i < argv.length; i++) {
-    const arg = argv[i]
-    if (arg === '--input') {
-      input = argv[i + 1]
-      i += 1
-    } else if (arg === '--from') {
-      from = argv[i + 1]
-      i += 1
-    } else if (arg === '--to') {
-      to = argv[i + 1]
-      i += 1
-    } else if (arg === '--context') {
-      context = argv[i + 1]
-      i += 1
-    } else if (arg === '--model') {
-      chatModel = argv[i + 1]
-      i += 1
-    } else if (arg === '--verbose') {
-      verbose = true
-    } else if (arg === '--output') {
-      output = argv[i + 1]
-      i += 1
-    } else if (arg === '--chunk-size') {
-      chunkSize = parseInt(argv[i + 1], 10)
-      i += 1
-    } else if (arg === '--fix-grammar') {
-      fixGrammarMode = true
-    } else if (arg === '--dry-run') {
-      dryRun = true
-    } else if (arg === '--help') {
-      printHelp()
-      return
-    } else {
-      printHelp()
-      throw new Error(`Invalid argument: ${arg}`)
+const argv = yargs(hideBin(process.argv))
+  .scriptName("translate-js")
+  .usage('$0 [options]')
+  .option('input', {
+    alias: 'i',
+    describe: 'Path to the input JSON file',
+    type: 'string',
+    demandOption: true,
+  })
+  .option('from', {
+    alias: 'f',
+    describe: 'Source language',
+    type: 'string',
+    default: 'auto',
+  })
+  .option('to', {
+    alias: 't',
+    describe: 'Target language',
+    type: 'string',
+  })
+  .option('context', {
+    alias: 'c',
+    describe: 'Context for translation',
+    type: 'string',
+  })
+  .option('model', {
+    alias: 'm',
+    describe: 'OpenAI model for translation',
+    type: 'string',
+    default: chatModel,
+    choices: chatModels,
+  })
+  .option('verbose', {
+    alias: 'v',
+    describe: 'Enable verbose output',
+    type: 'boolean',
+    default: false,
+  })
+  .option('output', {
+    alias: 'o',
+    describe: 'Path to save the translated JSON',
+    type: 'string',
+  })
+  .option('chunk-size', {
+    alias: 's',
+    describe: 'Number of key-value pairs to process in each API call',
+    type: 'number',
+    default: 32,
+  })
+  .option('fix-grammar', {
+    alias: 'g',
+    describe: 'Fixes grammar without translating',
+    type: 'boolean',
+    default: false,
+  })
+  //input format - json/xml
+  .option('format', {
+    alias: 'if',
+    describe: 'Input format',
+    type: 'string',
+    default: 'json',
+    choices: ['json', 'xml'],
+  })
+  .option('dry-run', {
+    describe: 'Simulates translation without calling OpenAI API',
+    type: 'boolean',
+    default: false,
+  })
+  .help()
+  .alias('help', 'h')
+  .check((argv) => {
+    if (!argv.fixGrammar && !argv.to) {
+      throw new Error('Missing --to argument');
     }
-  }
-  if (isNaN(chunkSize)) {
-    printHelp()
-    throw new Error('Invalid chunk size')
-  }
-  if (!input) {
-    printHelp()
-    throw new Error('Missing --input argument')
-  }
-  if (!from) {
-    from = 'auto'
-  }
-  if (!to && !fixGrammarMode) {
-    printHelp()
-    throw new Error('Missing --to argument')
-  }
-  if (verbose) {
-    if (fixGrammarMode) {
-      console.log(`Fixing grammar for ${input} (${from})`)
-    } else {
-      console.log(`Translating from ${input} from ${from} to ${to}`)
-    }
-    if (context) {
-      console.log(`Context: ${context}`)
-    }
-    console.log(`Model: ${chatModel}`)
-  }
-
-  //read file
-  const data = fs.readFileSync(input, 'utf8')
-  const json = JSON.parse(data)
-  const flattenedJSON = flattenJSON(json)
-  const keyValues = []
-  for (let key in flattenedJSON) {
-    keyValues.push({ key, value: flattenedJSON[key] })
-  }
-  //make a copy of the original keyValues
-  const outputFlattenedJSON = { ...flattenedJSON }
-  //split into chunks
-  const chunkedKeyValues = []
-  for (let i = 0; i < keyValues.length; i += chunkSize) {
-    chunkedKeyValues.push(keyValues.slice(i, i + chunkSize))
-  }
-  //translate chunk by chunk
-  if (!dryRun) {
-    for (let i = 0; i < chunkedKeyValues.length; i++) {
-      const chunk = chunkedKeyValues[i]
-      let translatedChunk 
-      if (fixGrammarMode) {
-        translatedChunk = await fixGrammar(chatModel, chunk, from, context)
-      } else {
-        translatedChunk = await translate(chatModel, chunk, from, to, context)
-      } 
-      for (let j = 0; j < translatedChunk.length; j++) {
-        const { key, value } = translatedChunk[j]
-        outputFlattenedJSON[key] = value
-      }
-      if (verbose) {
-        console.log(`Processed ${i + 1} / ${chunkedKeyValues.length} chunks`)
-      }
-    }
-  }
-  //inflate the json
-  const outputJSON = inflateJSON(outputFlattenedJSON)
+    return true;
+  })
+  .argv;
   
-  if (output) {
-    fs.writeFileSync(output, JSON.stringify(outputJSON, null, 2))
-  } else {
-    console.log(JSON.stringify(outputJSON, null, 2))
+
+// Utility function for verbose logging
+function logVerboseInfo(argv, mode) {
+  const { input, from, to, context, model, verbose } = argv;
+  if (verbose) {
+    console.log(mode === 'fixGrammar' ? `Fixing grammar for ${input} (${from})` : `Translating ${input} from ${from} to ${to}`);
+    if (context) {
+      console.log(`Context: ${context}`);
+    }
+    console.log(`Model: ${model}`);
   }
 }
 
-main(process.argv.slice(2))
+// Function to process chunks
+async function processChunks({ model, from, to, context, chunkedKeyValues, fixGrammarMode, verbose }) {
+  const outputFlattenedJSON = {};
+  for (let i = 0; i < chunkedKeyValues.length; i++) {
+    const chunk = chunkedKeyValues[i];
+    let translatedChunk = fixGrammarMode
+      ? await fixGrammar(model, chunk, from, context)
+      : await translate(model, chunk, from, to, context);
+
+    translatedChunk.forEach(({ key, value }) => {
+      outputFlattenedJSON[key] = value;
+    });
+
+    if (verbose) {
+      console.log(`Processed ${i + 1} / ${chunkedKeyValues.length} chunks`);
+    }
+  }
+  return outputFlattenedJSON;
+}
+
+const main = async (argv) => {
+  const { input, from, to, context, model, verbose, output, chunkSize, fixGrammar, dryRun, format } = argv;
+
+  logVerboseInfo(argv, fixGrammar ? 'fixGrammar' : 'translate');
+
+  // Read and parse file
+  const data = fs.readFileSync(input, 'utf8');
+
+  let keyValues = [];
+  let reconstructData = data;
+  if (format === 'json') {
+    const json = JSON.parse(data);
+    const flattenedJSON = flattenJSON(json);
+    keyValues = Object.entries(flattenedJSON).map(([key, value]) => ({ key, value }));
+  } else if (format === 'xml') {
+    const { result, parsedXml } = await flattenXML(data);
+    keyValues = Object.entries(result).map(([key, value]) => ({ key, value }));
+    reconstructData = parsedXml;
+  } else {
+    throw new Error('Invalid input format');
+  }
+
+  let outputFlattenedJSON;
+  if (!dryRun) {
+    const chunkedKeyValues = chunkArray(keyValues, chunkSize);
+    outputFlattenedJSON = await processChunks({
+      model,
+      from,
+      to,
+      context,
+      chunkedKeyValues,
+      fixGrammar,
+      verbose
+    });
+  } else {
+    outputFlattenedJSON = keyValues.reduce((acc, { key, value }) => {
+      acc[key] = value;
+      return acc;
+    }, {});
+  }
+
+  // Inflate the JSON
+  if (format === 'json') {
+    const outputJSON = inflateJSON(outputFlattenedJSON);
+    if (output) {
+      if (!dryRun) {
+        fs.writeFileSync(output, JSON.stringify(outputJSON, null, 2));
+      }
+    } else {
+      console.log(JSON.stringify(outputJSON, null, 2));
+    }
+  } else if (format === 'xml') {
+    const outputXML = await inflateXML(outputFlattenedJSON, reconstructData); 
+    if (output) {
+      if (!dryRun) {
+        fs.writeFileSync(output, outputXML);
+      }
+    } else {
+      console.log(outputXML);
+    }
+  }
+};
+
+main(argv)
 
 
 
