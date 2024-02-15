@@ -191,6 +191,46 @@ export const inflateJSON = (data) => {
   }
   return result;
 };
+
+
+
+export const flattenStrings = (data) => {
+  let result = {};
+
+  // Split the file content by lines and process each line
+  const lines = data.split('\n');
+  lines.forEach(line => {
+    // Trim whitespace and skip empty lines or comments
+    const trimmedLine = line.trim();
+    if (!trimmedLine || trimmedLine.startsWith('//') || trimmedLine.startsWith('/*')) {
+      return;
+    }
+
+    // Extract key and value using a regex
+    const match = trimmedLine.match(/^"([^"]+)"\s*=\s*"([^"]+)";$/);
+    if (match) {
+      const [, key, value] = match;
+      result[key] = value;
+    }
+  });
+
+  return result;
+};
+
+export const inflateStrings = (flattenedStrings) => {
+  let result = '';
+
+  Object.entries(flattenedStrings).forEach(([key, value]) => {
+    result += `"${key}" = "${value}";\n`;
+  });
+
+  return result.trim();
+};
+
+
+
+
+
 // Chunking function
 export function chunkArray(array, size) {
   const chunkedArray = [];

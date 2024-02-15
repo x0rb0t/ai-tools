@@ -2,7 +2,7 @@ import { OpenAI } from "openai";
 import * as fs from 'fs'
 import yargs from 'yargs';
 import { hideBin } from 'yargs/helpers';
-import { flattenJSON, inflateJSON, chunkArray, flattenXML, inflateXML } from "./utils.js";
+import { flattenJSON, inflateJSON, chunkArray, flattenXML, inflateXML, inflateStrings, flattenStrings } from "./utils.js";
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
@@ -207,7 +207,7 @@ const argv = yargs(hideBin(process.argv))
     describe: 'Input format',
     type: 'string',
     default: 'json',
-    choices: ['json', 'xml'],
+    choices: ['json', 'xml', 'strings'],
   })
   .option('dry-run', {
     describe: 'Simulates translation without calling OpenAI API',
@@ -275,6 +275,10 @@ const main = async (argv) => {
     const { result, parsedXml } = await flattenXML(data);
     keyValues = Object.entries(result).map(([key, value]) => ({ key, value }));
     reconstructData = parsedXml;
+  } else if (format === 'strings') {
+    //flattenStrings
+    const result = flattenStrings(data);
+    keyValues = Object.entries(result).map(([key, value]) => ({ key, value }));
   } else {
     throw new Error('Invalid input format');
   }
@@ -316,6 +320,15 @@ const main = async (argv) => {
       }
     } else {
       console.log(outputXML);
+    }
+  } else if (format === 'strings') {
+    const outputStrings = inflateStrings(outputFlattenedJSON);
+    if (output) {
+      if (!dryRun) {
+        fs.writeFileSync(output, outputStrings);
+      }
+    } else {
+      console.log(outputStrings);
     }
   }
 };
