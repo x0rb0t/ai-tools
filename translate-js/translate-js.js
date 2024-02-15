@@ -6,6 +6,7 @@ import { flattenJSON, inflateJSON, chunkArray, flattenXML, inflateXML } from "./
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
+  timeout: 20 * 1000,
 });
 
 
@@ -84,7 +85,7 @@ async function processKeyValues(model, keyValues, from, context, promptTemplate,
     max_tokens: 2048,
     temperature: 0.7,
     top_p: 0.9,
-    messages: messages
+    messages: messages,
   };
   const retryCount = 3;
   for (let i = 0; i < retryCount; i++) {
